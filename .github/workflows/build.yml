@@ -1,0 +1,49 @@
+
+name: Build Kapture Wiki SPFx Package
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Kapture-Wiki-SPFx-Source.zip'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.19.0'
+
+      - name: Extract Kapture Wiki source
+        run: |
+          unzip -q Kapture-Wiki-SPFx-Source.zip -d source
+
+      - name: Install dependencies
+        working-directory: source/Kapture-Wiki-SPFx-Prototype
+        run: npm install --no-audit --no-fund
+
+      - name: Clean project
+        working-directory: source/Kapture-Wiki-SPFx-Prototype
+        run: npx gulp clean
+
+      - name: Build SPFx solution
+        working-directory: source/Kapture-Wiki-SPFx-Prototype
+        run: npx gulp bundle --ship
+
+      - name: Package SharePoint application
+        working-directory: source/Kapture-Wiki-SPFx-Prototype
+        run: npx gulp package-solution --ship
+
+      - name: Upload SPFx package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kapture-Wiki-SharePoint-Package
+          path: source/Kapture-Wiki-SPFx-Prototype/sharepoint/solution/*.sppkg
+          if-no-files-found: error
