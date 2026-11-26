@@ -1,13 +1,12 @@
 name: Build Kapture Wiki SPFx Package
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - '*.zip'
       - '.github/workflows/build.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,71 +14,62 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Locate and extract source ZIP
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_ZIP="$(find . -maxdepth 1 -type f -name '*.zip' -print | sort | head -n 1)"
+          if [ -z "$SOURCE_ZIP" ]; then
+            echo "No source ZIP found in the repository root." >&2
+            exit 1
+          fi
+          mkdir -p source
+          unzip -q "$SOURCE_ZIP" -d source
+          PROJECT_DIR="$(find source -mindepth 1 -maxdepth 4 -type f -name package.json -printf '%h\n' | head -n 1)"
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "The ZIP does not contain a project package.json." >&2
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Using project directory: $PROJECT_DIR"
+          test -f "$PROJECT_DIR/config/package-solution.json"
+          test -f "$PROJECT_DIR/src/webparts/kaptureWiki/KaptureWikiWebPart.manifest.json"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.19.0'
 
-      - name: Find source ZIP
-        id: source
-        shell: bash
-        run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname '*.zip' | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "No source ZIP found"
-            exit 1
-          fi
-          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
-
-      - name: Extract source
-        run: |
-          mkdir source
-          unzip -q "${{ steps.source.outputs.zip_file }}" -d source
-
-      - name: Locate SPFx project
-        id: project
-        run: |
-          PROJECT=$(find source -name package.json -not -path '*/node_modules/*' | head -n 1)
-          if [ -z "$PROJECT" ]; then
-            echo "SPFx package.json not found"
-            exit 1
-          fi
-          echo "project_dir=$(dirname "$PROJECT")" >> "$GITHUB_OUTPUT"
-
       - name: Install dependencies
-        working-directory: ${{ steps.project.outputs.project_dir }}
-        run: npm install --legacy-peer-deps --no-audit --no-fund
-
-      - name: Install build compatibility dependencies
-        working-directory: ${{ steps.project.outputs.project_dir }}
-        run: npm install --no-save --legacy-peer-deps ajv@^8 eslint@8.57.0
+        run: cd "$PROJECT_DIR" && npm install --no-audit --no-fund
 
       - name: Clean project
-        working-directory: ${{ steps.project.outputs.project_dir }}
-        run: npx gulp clean
+        run: cd "$PROJECT_DIR" && npx gulp clean
 
       - name: Build SPFx solution
-        working-directory: ${{ steps.project.outputs.project_dir }}
-        run: npx gulp bundle --ship
+        run: cd "$PROJECT_DIR" && npx gulp bundle --ship
 
       - name: Package SharePoint application
-        working-directory: ${{ steps.project.outputs.project_dir }}
-        run: npx gulp package-solution --ship
+        run: cd "$PROJECT_DIR" && npx gulp package-solution --ship
 
       - name: Verify generated package
-        working-directory: ${{ steps.project.outputs.project_dir }}
+        shell: bash
         run: |
-          test -s sharepoint/solution/kapture-wiki.sppkg
-          ls -lh sharepoint/solution/kapture-wiki.sppkg
+          set -euo pipefail
+          PACKAGE="$PROJECT_DIR/sharepoint/solution/kapture-wiki.sppkg"
+          test -s "$PACKAGE"
+          ls -lh "$PACKAGE"
 
-      - name: Upload SPFx package
+      - name: Upload SPFx package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kapture-Wiki-SharePoint-Package
-          path: ${{ steps.project.outputs.project_dir }}/sharepoint/solution/kapture-wiki.sppkg
+          name: kapture-wiki-sppkg
+          path: ${{ env.PROJECT_DIR }}/sharepoint/solution/kapture-wiki.sppkg
           if-no-files-found: error
+          retention-days: 14
