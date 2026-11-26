@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'Kapture-Wiki-SPFx-Corrected-Build-Source.zip'
+      - 'Kapture-Wiki-SPFx-Corrected-Source-v2.zip'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -26,18 +26,14 @@ jobs:
         with:
           node-version: '18.19.0'
 
-      - name: Verify source ZIP exists
+      - name: Verify source ZIP
         run: |
           ls -lah
-          test -f Kapture-Wiki-SPFx-Corrected-Build-Source.zip
+          test -f Kapture-Wiki-SPFx-Corrected-Source-v2.zip
 
-      - name: Extract Kapture Wiki source
+      - name: Extract source
         run: |
-          unzip -q Kapture-Wiki-SPFx-Corrected-Build-Source.zip -d source
-          find source -maxdepth 3 -type f | head -50
-
-      - name: Verify project folder
-        run: |
+          unzip -q Kapture-Wiki-SPFx-Corrected-Source-v2.zip -d source
           test -f source/Kapture-Wiki-SPFx-Prototype/package.json
 
       - name: Install dependencies
@@ -62,7 +58,7 @@ jobs:
           test -s sharepoint/solution/kapture-wiki.sppkg
           ls -lh sharepoint/solution/kapture-wiki.sppkg
 
-      - name: Upload SPFx package as artifact
+      - name: Upload SPFx package
         uses: actions/upload-artifact@v4
         with:
           name: Kapture-Wiki-SharePoint-Package
