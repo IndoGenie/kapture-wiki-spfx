@@ -20,25 +20,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18.19.0'
+          cache: npm
+          cache-dependency-path: source/Kapture-Wiki-SPFx-Prototype/package.json
 
       - name: Extract Kapture Wiki source
         run: |
           unzip -q Kapture-Wiki-SPFx-Source.zip -d source
 
-      
-      
-      - name: Correct SPFx tooling versions
+      - name: Correct SPFx tooling dependencies
         working-directory: source/Kapture-Wiki-SPFx-Prototype
         run: |
+          npm pkg delete "devDependencies.@microsoft/sp-tsconfig"
           npm pkg set "devDependencies.@microsoft/sp-build-web=1.20.2"
           npm pkg set "devDependencies.@microsoft/sp-module-interfaces=1.20.2"
-          npm pkg set "devDependencies.@microsoft/sp-tsconfig=1.20.2"
-
+          npm pkg set "devDependencies.@microsoft/sp-tslint-rules=1.20.2"
+          npm pkg set "devDependencies.@microsoft/sp-webpart-workbench=1.20.2"
 
       - name: Install dependencies
         working-directory: source/Kapture-Wiki-SPFx-Prototype
         run: npm install --no-audit --no-fund
-
 
       - name: Clean project
         working-directory: source/Kapture-Wiki-SPFx-Prototype
@@ -52,9 +52,15 @@ jobs:
         working-directory: source/Kapture-Wiki-SPFx-Prototype
         run: npx gulp package-solution --ship
 
+      - name: Verify generated package
+        working-directory: source/Kapture-Wiki-SPFx-Prototype
+        run: |
+          ls -lh sharepoint/solution/*.sppkg
+          test -f sharepoint/solution/kapture-wiki.sppkg
+
       - name: Upload SPFx package
         uses: actions/upload-artifact@v4
         with:
           name: Kapture-Wiki-SharePoint-Package
-          path: source/Kapture-Wiki-SPFx-Prototype/sharepoint/solution/*.sppkg
+          path: source/Kapture-Wiki-SPFx-Prototype/sharepoint/solution/kapture-wiki.sppkg
           if-no-files-found: error
