@@ -25,9 +25,17 @@ jobs:
         run: |
           unzip -q Kapture-Wiki-SPFx-Source.zip -d source
 
+      
+      - name: Correct SPFx tooling versions
+        working-directory: source/Kapture-Wiki-SPFx-Prototype
+        run: |
+          npm pkg set "devDependencies.@microsoft/sp-build-web=1.20.2"
+          npm pkg set "devDependencies.@microsoft/sp-module-interfaces=1.20.2"
+
       - name: Install dependencies
         working-directory: source/Kapture-Wiki-SPFx-Prototype
         run: npm install --no-audit --no-fund
+
 
       - name: Clean project
         working-directory: source/Kapture-Wiki-SPFx-Prototype
