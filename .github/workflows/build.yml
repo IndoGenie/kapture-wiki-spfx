@@ -25,9 +25,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18.19.0'
-          cache: npm
 
-      - name: Verify source ZIP
+      - name: Find and verify source ZIP
         id: source
         shell: bash
         run: |
@@ -36,56 +35,68 @@ jobs:
             | sort -V | tail -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Corrected source ZIP not found."
+            echo "ERROR: Source ZIP not found."
             exit 1
           fi
 
-          echo "Using source: $ZIP_FILE"
-          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+          echo "Selected: $ZIP_FILE"
           unzip -t "$ZIP_FILE"
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
 
       - name: Extract source
+        shell: bash
         run: |
           mkdir -p source
           unzip -q "${{ steps.source.outputs.zip_file }}" -d source
 
-          PROJECT_DIR=$(find source -type f -name package.json \
+          PROJECT_DIR=$(find source -type f \
+            -name package.json \
             -not -path '*/node_modules/*' \
             -printf '%h\n' | head -n 1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: SPFx project folder not found."
+            echo "ERROR: SPFx project not found."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Found project: $PROJECT_DIR"
+          echo "Project: $PROJECT_DIR"
 
       - name: Install dependencies
-        working-directory: .
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
           npm install --no-audit --no-fund
 
       - name: Clean project
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
           npx gulp clean
 
       - name: Build SPFx solution
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
           npx gulp bundle --ship
 
       - name: Package SharePoint application
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
           npx gulp package-solution --ship
 
       - name: Verify generated package
+        shell: bash
         run: |
-          test -s "$PROJECT_DIR/sharepoint/solution/kapture-wiki.sppkg"
-          ls -lh "$PROJECT_DIR/sharepoint/solution/kapture-wiki.sppkg"
+          PACKAGE="$PROJECT_DIR/sharepoint/solution/kapture-wiki.sppkg"
+
+          if [ ! -s "$PACKAGE" ]; then
+            echo "ERROR: SPFx package was not generated."
+            exit 1
+          fi
+
+          ls -lh "$PACKAGE"
 
       - name: Upload SPFx package
         uses: actions/upload-artifact@v4
