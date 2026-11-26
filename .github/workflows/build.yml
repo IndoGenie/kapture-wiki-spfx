@@ -20,8 +20,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18.19.0'
-          cache: npm
-          cache-dependency-path: source/Kapture-Wiki-SPFx-Prototype/package.json
 
       - name: Extract Kapture Wiki source
         run: |
@@ -33,8 +31,6 @@ jobs:
           npm pkg delete "devDependencies.@microsoft/sp-tsconfig"
           npm pkg set "devDependencies.@microsoft/sp-build-web=1.20.2"
           npm pkg set "devDependencies.@microsoft/sp-module-interfaces=1.20.2"
-          npm pkg set "devDependencies.@microsoft/sp-tslint-rules=1.20.2"
-          npm pkg set "devDependencies.@microsoft/sp-webpart-workbench=1.20.2"
 
       - name: Install dependencies
         working-directory: source/Kapture-Wiki-SPFx-Prototype
@@ -55,7 +51,7 @@ jobs:
       - name: Verify generated package
         working-directory: source/Kapture-Wiki-SPFx-Prototype
         run: |
-          ls -lh sharepoint/solution/*.sppkg
+          ls -lh sharepoint/solution/
           test -f sharepoint/solution/kapture-wiki.sppkg
 
       - name: Upload SPFx package
