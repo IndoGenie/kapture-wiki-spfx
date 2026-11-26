@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'Kapture-Wiki-SPFx-Corrected-Source-v2.zip'
+      - 'Kapture-Wiki-SPFx-Corrected-Source-*.zip'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -25,42 +25,71 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18.19.0'
+          cache: npm
 
       - name: Verify source ZIP
+        id: source
+        shell: bash
         run: |
-          ls -lah
-          test -f Kapture-Wiki-SPFx-Corrected-Source-v2.zip
+          ZIP_FILE=$(find . -maxdepth 1 -type f \
+            -name 'Kapture-Wiki-SPFx-Corrected-Source-*.zip' \
+            | sort -V | tail -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: Corrected source ZIP not found."
+            exit 1
+          fi
+
+          echo "Using source: $ZIP_FILE"
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+          unzip -t "$ZIP_FILE"
 
       - name: Extract source
         run: |
-          unzip -q Kapture-Wiki-SPFx-Corrected-Source-v2.zip -d source
-          test -f source/Kapture-Wiki-SPFx-Prototype/package.json
+          mkdir -p source
+          unzip -q "${{ steps.source.outputs.zip_file }}" -d source
+
+          PROJECT_DIR=$(find source -type f -name package.json \
+            -not -path '*/node_modules/*' \
+            -printf '%h\n' | head -n 1)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: SPFx project folder not found."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Found project: $PROJECT_DIR"
 
       - name: Install dependencies
-        working-directory: source/Kapture-Wiki-SPFx-Prototype
-        run: npm install --no-audit --no-fund
+        working-directory: .
+        run: |
+          cd "$PROJECT_DIR"
+          npm install --no-audit --no-fund
 
       - name: Clean project
-        working-directory: source/Kapture-Wiki-SPFx-Prototype
-        run: npx gulp clean
+        run: |
+          cd "$PROJECT_DIR"
+          npx gulp clean
 
       - name: Build SPFx solution
-        working-directory: source/Kapture-Wiki-SPFx-Prototype
-        run: npx gulp bundle --ship
+        run: |
+          cd "$PROJECT_DIR"
+          npx gulp bundle --ship
 
       - name: Package SharePoint application
-        working-directory: source/Kapture-Wiki-SPFx-Prototype
-        run: npx gulp package-solution --ship
+        run: |
+          cd "$PROJECT_DIR"
+          npx gulp package-solution --ship
 
       - name: Verify generated package
-        working-directory: source/Kapture-Wiki-SPFx-Prototype
         run: |
-          test -s sharepoint/solution/kapture-wiki.sppkg
-          ls -lh sharepoint/solution/kapture-wiki.sppkg
+          test -s "$PROJECT_DIR/sharepoint/solution/kapture-wiki.sppkg"
+          ls -lh "$PROJECT_DIR/sharepoint/solution/kapture-wiki.sppkg"
 
       - name: Upload SPFx package
         uses: actions/upload-artifact@v4
         with:
           name: Kapture-Wiki-SharePoint-Package
-          path: source/Kapture-Wiki-SPFx-Prototype/sharepoint/solution/kapture-wiki.sppkg
+          path: ${{ env.PROJECT_DIR }}/sharepoint/solution/kapture-wiki.sppkg
           if-no-files-found: error
