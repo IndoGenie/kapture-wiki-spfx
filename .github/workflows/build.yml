@@ -1,17 +1,20 @@
-
 name: Build Kapture Wiki SPFx Package
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     paths:
       - 'Kapture-Wiki-SPFx-Source.zip'
       - '.github/workflows/build.yml'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,13 +27,6 @@ jobs:
       - name: Extract Kapture Wiki source
         run: |
           unzip -q Kapture-Wiki-SPFx-Source.zip -d source
-
-      - name: Correct SPFx tooling dependencies
-        working-directory: source/Kapture-Wiki-SPFx-Prototype
-        run: |
-          npm pkg delete "devDependencies.@microsoft/sp-tsconfig"
-          npm pkg set "devDependencies.@microsoft/sp-build-web=1.20.2"
-          npm pkg set "devDependencies.@microsoft/sp-module-interfaces=1.20.2"
 
       - name: Install dependencies
         working-directory: source/Kapture-Wiki-SPFx-Prototype
@@ -51,8 +47,8 @@ jobs:
       - name: Verify generated package
         working-directory: source/Kapture-Wiki-SPFx-Prototype
         run: |
-          ls -lh sharepoint/solution/
-          test -f sharepoint/solution/kapture-wiki.sppkg
+          test -s sharepoint/solution/kapture-wiki.sppkg
+          ls -lh sharepoint/solution/kapture-wiki.sppkg
 
       - name: Upload SPFx package
         uses: actions/upload-artifact@v4
