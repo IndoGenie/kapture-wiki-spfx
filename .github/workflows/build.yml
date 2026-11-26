@@ -55,9 +55,9 @@ jobs:
         working-directory: ${{ steps.project.outputs.project_dir }}
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Install AJV compatibility dependency
+      - name: Install build compatibility dependencies
         working-directory: ${{ steps.project.outputs.project_dir }}
-        run: npm install --no-save --legacy-peer-deps ajv@^8
+        run: npm install --no-save --legacy-peer-deps ajv@^8 eslint@8.57.0
 
       - name: Clean project
         working-directory: ${{ steps.project.outputs.project_dir }}
