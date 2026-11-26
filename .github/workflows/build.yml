@@ -26,81 +26,79 @@ jobs:
         with:
           node-version: '18.19.0'
 
-      - name: Find and verify source ZIP
+      - name: Verify source ZIP
         id: source
         shell: bash
         run: |
           ZIP_FILE=$(find . -maxdepth 1 -type f \
-            -name 'Kapture-Wiki-SPFx-Corrected-Source-*.zip' \
+            -iname 'Kapture-Wiki-SPFx-Corrected-Source-*.zip' \
             | sort -V | tail -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Source ZIP not found."
+            echo "ERROR: No Kapture Wiki source ZIP found."
             exit 1
           fi
 
-          echo "Selected: $ZIP_FILE"
-          unzip -t "$ZIP_FILE"
+          echo "Using source: $ZIP_FILE"
           echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
 
       - name: Extract source
-        shell: bash
         run: |
           mkdir -p source
           unzip -q "${{ steps.source.outputs.zip_file }}" -d source
 
-          PROJECT_DIR=$(find source -type f \
-            -name package.json \
-            -not -path '*/node_modules/*' \
-            -printf '%h\n' | head -n 1)
+      - name: Locate SPFx project
+        id: project
+        shell: bash
+        run: |
+          PACKAGE_FILE=$(find source -name package.json -print -quit)
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: SPFx project not found."
+          if [ -z "$PACKAGE_FILE" ]; then
+            echo "ERROR: package.json not found."
             exit 1
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project: $PROJECT_DIR"
+          PROJECT_DIR=$(dirname "$PACKAGE_FILE")
+          echo "Project directory: $PROJECT_DIR"
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-          npm install --no-audit --no-fund
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Clean project
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-          npx gulp clean
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        run: npx gulp clean
 
       - name: Build SPFx solution
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-          npx gulp bundle --ship
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        run: npx gulp bundle --ship
 
       - name: Package SharePoint application
-        shell: bash
-        run: |
-          cd "$PROJECT_DIR"
-          npx gulp package-solution --ship
+        working-directory: ${{ steps.project.outputs.project_dir }}
+        run: npx gulp package-solution --ship
 
       - name: Verify generated package
+        id: package
         shell: bash
+        working-directory: ${{ steps.project.outputs.project_dir }}
         run: |
-          PACKAGE="$PROJECT_DIR/sharepoint/solution/kapture-wiki.sppkg"
+          SPPKG=$(find sharepoint/solution -maxdepth 1 \
+            -type f -name '*.sppkg' -print -quit)
 
-          if [ ! -s "$PACKAGE" ]; then
+          if [ -z "$SPPKG" ] || [ ! -s "$SPPKG" ]; then
             echo "ERROR: SPFx package was not generated."
             exit 1
           fi
 
-          ls -lh "$PACKAGE"
+          echo "Generated package:"
+          ls -lh "$SPPKG"
+          echo "package_path=$SPPKG" >> "$GITHUB_OUTPUT"
 
       - name: Upload SPFx package
         uses: actions/upload-artifact@v4
         with:
           name: Kapture-Wiki-SharePoint-Package
-          path: ${{ env.PROJECT_DIR }}/sharepoint/solution/kapture-wiki.sppkg
+          path: ${{ steps.project.outputs.project_dir }}/${{ steps.package.outputs.package_path }}
           if-no-files-found: error
+          retention-days: 14
